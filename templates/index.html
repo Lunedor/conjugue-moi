@@ -145,6 +145,14 @@
 			border-width: 1px;
         }
 		
+		#loadingIndicator {
+			display: none;  /* Initially hidden */
+			text-align: center;
+			font-style: italic;
+			color: var(--accent-color);  /* Or any other color */
+			margin-top: 10px;
+		}
+		
     </style>
 </head>
 <body>
@@ -201,6 +209,7 @@
     </form>
 	<button id="exportButton" style="display:none;">Exporter vers Excel</button> </div>
     <div id="resultsContainer">
+		<div id="loadingIndicator" style="display: none;">Chargement...</div>
         <table id="conjugationTable">
             <thead>
                 <tr>
@@ -387,6 +396,7 @@
 			tbody.innerHTML = ''; // Clear previous results
 
 			try {
+				document.getElementById('loadingIndicator').style.display = 'block';
 				const targetLang = document.getElementById('target_lang').value || 'en';
 				const response = await fetch('/', { method: 'POST', body: formData, headers: { 'X-Target-Language': targetLang}  });
 				if (!response.ok) {
@@ -430,8 +440,13 @@
 				} else {
 					tbody.innerHTML = '<tr><td colspan="7">No results found.</td></tr>';
 				}
-			} catch (error) {
+			} 
+		catch (error) {
 				tbody.innerHTML = `<tr><td colspan="7">Error: ${error.message}</td></tr>`;
+			}
+			finally {
+			// Hide loading indicator regardless of success or failure:
+			document.getElementById('loadingIndicator').style.display = 'none';
 			}
 		});
 		
