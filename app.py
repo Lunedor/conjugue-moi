@@ -1,4 +1,5 @@
 import os
+import re
 import time
 from flask import Flask, render_template, request, jsonify, Response, session, send_from_directory
 from bs4 import BeautifulSoup
@@ -6,24 +7,25 @@ import requests
 from gtts import gTTS
 import openpyxl  # You're using openpyxl for Excel export
 from googletrans import Translator
+from googletrans.constants import LANGUAGES
 from io import BytesIO
-import re
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
 translator = Translator()
 
-def get_word_data(word):
+def get_word_data(word, target_lang='en'):
     url = f"https://www.larousse.fr/dictionnaires/francais/{word}"
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'}
+    print(f"Translating {word} to {target_lang}") 
     try:
         response = requests.get(url, headers=headers, timeout=5) #Added timeout to prevent indefinite hangs
         response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
         soup = BeautifulSoup(response.content, "html.parser")
         # improved translation handling:
         try:
-          translation = translator.translate(word, src='fr', dest='tr')
+          translation = translator.translate(word, src='fr', dest=target_lang)
           meaning = translation.text
         except Exception as e:
           meaning = f"Translation error: {e}" # Handle translation errors gracefully
@@ -40,6 +42,17 @@ def get_word_data(word):
     except Exception as e:
         print(f"An error occurred for {word}: {e}")
         return f"An error occurred for {word}: {e}", None #Return more informative error message
+
+@app.route('/set_language', methods=['POST'])
+def set_language():
+    target_lang = request.form.get('target_lang')
+    print(f"Received target_lang: {target_lang}")  # Debugging line
+    if target_lang and (target_lang in LANGUAGES or target_lang in LANGUAGES.values()):
+        session['target_lang'] = target_lang
+        print(f"Session updated with target_lang: {session['target_lang']}")  # Debugging line
+        return jsonify({'message': 'Target language set successfully'}), 200
+    else:
+        return jsonify({'error': 'Invalid target language'}), 400
         
 def get_conjugations(url):
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'}
@@ -86,23 +99,29 @@ def get_conjugations(url):
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'GET':
-            session.clear() #Clear the session 
-            return render_template('index.html')
+        session.pop('results', None)  # Clear results on GET request
+        return render_template('index.html', target_lang=session.get('target_lang', 'en'))
+
     elif request.method == 'POST':
-        session.pop('results', None)
-        verbs = request.form.getlist('verbs[]') #This line is already correct.  No changes needed here
+        session.pop('results', None)  # Clear any old results
+        target_lang = session.get('target_lang', 'en')  # Get the target language from the session
+        print(f"Using target_lang for translation: {target_lang}")  # Debugging line
+
+        verbs = request.form.getlist('verbs[]')
         results = []
         for verb in verbs:
-            verb = verb.strip() #Remove leading/trailing whitespace
-            meaning, conjugation_url = get_word_data(verb)
+            verb = verb.strip()
+            meaning, conjugation_url = get_word_data(verb, target_lang)  # Pass the correct target_lang
             conjugations = {}
             if conjugation_url:
                 conjugations = get_conjugations(conjugation_url)
             results.append({'verb': verb, 'meaning': meaning, 'conjugations': conjugations})
         session['results'] = results
-        return jsonify({'results': results})
-    return render_template('index.html')
+        return jsonify({'results': results})  # Return JSON after processing
 
+    return render_template('index.html', target_lang=session.get('target_lang', 'en'))  # Handle other cases if necessary
+
+    
 @app.route('/pronounce', methods=['POST'])
 def pronounce():
     try:
