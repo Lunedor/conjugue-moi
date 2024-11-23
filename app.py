@@ -1,6 +1,6 @@
 import os
 import time
-from flask import Flask, render_template, request, jsonify, Response, session
+from flask import Flask, render_template, request, jsonify, Response, session, send_from_directory
 from bs4 import BeautifulSoup
 import requests
 from gtts import gTTS
@@ -206,12 +206,20 @@ def export_excel():
             cell.alignment = openpyxl.styles.Alignment(wrapText=True)
             if conj_list:
                 sheet.row_dimensions[row_index + 1].height = len(conj_list) * 15
+                
+    output = BytesIO() #Create a BytesIO object to hold the Excel file data
+    workbook.save(output)
+    output.seek(0) 
 
     try:
         timestr = time.strftime("%Y%m%d-%H%M%S")
         filename = f"verb_conjugations_{timestr}.xlsx"
-        workbook.save(filename)
-        return jsonify({'message': 'Fichier Excel créé!', 'filename': filename})
+        response = Response(
+        output,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",  # Correct MIME type
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+        return response
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
