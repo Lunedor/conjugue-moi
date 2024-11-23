@@ -105,23 +105,26 @@ def index():
     elif request.method == 'POST':
         session.pop('results', None)  # Clear any old results
         target_lang = session.get('target_lang', 'en')  # Get the target language from the session
-        print(f"Using target_lang for translation: {target_lang}")  # Debugging line
+        
+        verbs = request.form.getlist('verbs[]')  # Get the verbs list
+        if not verbs or all(v.strip() == '' for v in verbs):  # Check for empty or blank inputs
+            return jsonify({'error': 'No verbs provided for translation'}), 400
 
-        verbs = request.form.getlist('verbs[]')
         results = []
         for verb in verbs:
             verb = verb.strip()
-            meaning, conjugation_url = get_word_data(verb, target_lang)  # Pass the correct target_lang
-            conjugations = {}
-            if conjugation_url:
-                conjugations = get_conjugations(conjugation_url)
-            results.append({'verb': verb, 'meaning': meaning, 'conjugations': conjugations})
+            if verb:  # Skip empty verbs
+                meaning, conjugation_url = get_word_data(verb, target_lang)  # Pass target_lang
+                conjugations = {}
+                if conjugation_url:
+                    conjugations = get_conjugations(conjugation_url)
+                results.append({'verb': verb, 'meaning': meaning, 'conjugations': conjugations})
+
         session['results'] = results
         return jsonify({'results': results})  # Return JSON after processing
 
     return render_template('index.html', target_lang=session.get('target_lang', 'en'))  # Handle other cases if necessary
-
-    
+  
 @app.route('/pronounce', methods=['POST'])
 def pronounce():
     try:
