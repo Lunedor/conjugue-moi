@@ -225,16 +225,32 @@
 						exportButton.textContent = "Exportation..."; // Provide visual feedback (optional)
 
 						try {
-							const response = await fetch('/export', { method: 'POST', body: formData });
+							const verbs = document.getElementById('verbs').value.trim().split('\n');
+							const formData = new FormData();
+							verbs.forEach(verb => formData.append('verbs[]', verb.trim()));
 
+
+							const response = await fetch('/export', { method: 'POST', body: formData });
 							if (!response.ok) {
 								const errorData = await response.json(); // Get error message from server if available
 								const errorMessage = errorData && errorData.error ? errorData.error : `HTTP error! status: ${response.status}`;
 								alert(`Error exporting: ${errorMessage}`); // Display error message
 
-							} else {
-								const data = await response.json();
-								alert(data.message); // Or handle the successful response as needed
+							} else {const blob = await response.blob(); // Get the file as a Blob
+									const url = window.URL.createObjectURL(blob); // Create a temporary URL
+
+									const timestr = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, ""); //Get the current time as unique string for filename
+									const filename = "verb_conjugations_" + timestr + ".xlsx"
+
+									const a = document.createElement('a'); // Create a download link
+									a.href = url;
+									a.download = filename; // Set the filename for download
+									document.body.appendChild(a);  // Append to the DOM (needed for click event)
+									a.click();                      // Trigger the click event to start download
+									window.URL.revokeObjectURL(url); // Clean up after download
+									a.remove();                    // Remove the temporary link from DOM
+									alert("File downloaded!"); //Alert user for file downloaded (Optional)
+								 // Or handle the successful response as needed
 							}
 
 
