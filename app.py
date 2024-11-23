@@ -214,6 +214,3 @@ def export_excel():
         return jsonify({'message': 'Fichier Excel créé!', 'filename': filename})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
-if __name__ == '__main__':
-    app.run(debug=True)
