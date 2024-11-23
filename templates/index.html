@@ -237,7 +237,6 @@
 
         darkModeToggle.addEventListener('click', updateDarkMode);
 
-        // Load preference on startup (MOVED OUTSIDE FORM SUBMIT)
         document.addEventListener('DOMContentLoaded', () => {
             const savedPreference = localStorage.getItem('darkMode');
 			const savedTargetLang = localStorage.getItem('target_lang');
@@ -299,7 +298,6 @@
 				if (response.ok) {
 					localStorage.setItem('target_lang', langToSend);
 					console.log("Target language set to:", langToSend);
-					form.dispatchEvent(new Event('submit')); // Re-submit to refresh translations
 				} else {
 					response.json().then(errorData => {
 						const error = errorData.error || "Error setting language. Please check the language code.";
