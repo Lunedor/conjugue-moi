@@ -1,0 +1,7 @@
+Flask
+BeautifulSoup4
+requests
+gTTS
+openpyxl
+googletrans==4.0.0-rc1
+pygame

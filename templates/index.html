@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Conjugue-Moi!</title>
+	<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> </script> </head>
+    <style>
+        :root {
+            --bg-color: #fff;
+            --text-color: #000;
+            --table-border: #ddd;
+            --table-header-bg: #f2f2f2;
+            --button-bg: #5090A0;
+            --button-text: #fff;
+            --accent-color: #5090A0; /* Blue accent for light mode */
+        }
+
+        .dark-mode {
+            --bg-color: #282c34; /* Dark background */
+            --text-color: #e8e6e3;  /* Lighter text */
+            --table-border: #555;  /* Darker table border */
+            --table-header-bg: #373c45;  /* Darker header background */
+            --button-bg: #5090A0; /* Different button color */
+            --button-text: #282c34; /* Dark text on button */
+            --accent-color: #5090A0; /* Teal accent for dark mode */
+
+        }
+
+        body {
+            font-family: sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.3s ease, color 0.3s ease; /* Smooth transition for mode change */
+        }
+
+        .container {  max-width: 800px; margin: 0 auto; padding: 20px;}
+		
+        h1 { text-align: center; color: var(--accent-color);} /* Use accent color for title */
+		
+        label { display: block; margin-bottom: 5px; }
+		
+        textarea { width: 100%; padding: 10px; border: 1px solid var(--table-border); margin-bottom: 10px; border-radius: 4px;}
+		
+        button, input[type="submit"] {
+            background-color: var(--button-bg);
+            color: var(--button-text);
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s ease; /* Smooth button transition */
+        }
+        button:hover, input[type="submit"]:hover { filter: brightness(50%); } /* Button hover effect */
+
+        table { width: 70%; border-collapse: collapse; margin: auto;}
+        th, td { border: 1px solid var(--table-border); padding: 8px; text-align: left; }
+        th { background-color: var(--table-header-bg); }
+        #resultsContainer { margin-top: 10px; }
+
+        .mode-toggle {
+            position: fixed; /* Fixed position */
+            top: 10px;       /* Top-right corner */
+            right: 10px;
+        }
+
+
+         button { /* General button styles */
+            padding: 8px 12px; /* Slightly reduced padding */
+            border-radius: 4px;
+			margin: auto;
+			margin-top: 10px;
+        }
+
+        .pronounce-button { /* Specific styles for speaker button */
+            background-color: var(--accent-color);
+            color: var(--bg-color); /* Text color contrasts with background */
+            border-radius: 50%; /* Make it a circle */
+			padding: 3px;
+			margin: 3px;
+            font-size: 14px;
+            border: none;
+            cursor: pointer;
+            transition: transform 0.2s ease, filter 0.2s ease; /* Add transitions */
+        }
+
+        .pronounce-button:hover {
+            transform: scale(1.1); /* Slight scale up on hover */
+            filter: brightness(1.2); /* Slightly brighter on hover */
+        }
+
+        span.conjugated-verb { margin-left: 8px; }
+		
+    </style>
+</head>
+<body>
+	<div class="container">
+	<div class="mode-toggle">
+			<button id="darkModeToggle">Dark Mode</button>
+	</div>
+    <h1>Conjugue-Moi!</h1>
+    <form method="POST">
+        <label for="verbs">Entrez les verbes (un par ligne):</label><br>
+        <textarea id="verbs" name="verbs[]" rows="5" cols="30"></textarea><br>
+        <input type="submit" value="Soumettre">
+    </form>
+	<button id="exportButton" style="display:none;">Exporter vers Excel</button> </div>
+    <div id="resultsContainer">
+        <table id="conjugationTable">
+            <thead>
+                <tr>
+                    <th>Verbe</th>
+                    <th>Traduction</th>
+                    <th>Présent</th>
+                    <th>Imparfait</th>
+                    <th>Passé Composé</th>
+                    <th>Futur Simple</th>
+                    <th>Impératif</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <script>
+        const form = document.querySelector('form');
+		const tbody = document.querySelector('#conjugationTable tbody');
+		const exportButton = document.getElementById('exportButton'); // Get the export button
+		const darkModeToggle = document.getElementById('darkModeToggle');
+        const body = document.body;
+
+        function updateDarkMode() {
+            body.classList.toggle('dark-mode');
+            darkModeToggle.textContent = body.classList.contains('dark-mode') ? "Thème Clair" : "Thème Sombre";
+            localStorage.setItem('darkMode', body.classList.contains('dark-mode') ? 'enabled' : 'disabled');
+        }
+
+        darkModeToggle.addEventListener('click', updateDarkMode);
+
+        // Load preference on startup (MOVED OUTSIDE FORM SUBMIT)
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedPreference = localStorage.getItem('darkMode');
+            if (savedPreference === 'enabled') {
+                body.classList.add('dark-mode');
+                darkModeToggle.textContent = "Thème Clair";
+            } else if (savedPreference === 'disabled') {
+                body.classList.remove('dark-mode'); 
+                darkModeToggle.textContent = "Thème Sombre"; 
+            }
+        });
+
+		form.addEventListener('submit', async (event) => {
+			event.preventDefault();
+			const verbs = document.getElementById('verbs').value.trim().split('\n');
+			const formData = new FormData();
+
+			verbs.forEach(verb => {
+				formData.append('verbs[]', verb.trim());
+			});
+
+			tbody.innerHTML = ''; // Clear previous results
+
+			try {
+				const response = await fetch('/', { method: 'POST', body: formData });
+				if (!response.ok) {
+					throw new Error(`HTTP error! status: ${response.status}`);
+				}
+				const data = await response.json();
+
+				if (data.results && data.results.length > 0) {
+					data.results.forEach((result, rowIndex) => {
+						const row = tbody.insertRow();
+						row.insertCell().textContent = result.verb;
+						row.insertCell().textContent = result.meaning;
+
+						['Présent', 'Imparfait', 'Passé composé', 'Futur', 'Impératif'].forEach(tense => {
+							const cell = row.insertCell();
+							const conjugations = result.conjugations[tense] || [];
+
+							conjugations.forEach(conjugatedVerb => {
+								const verbSpan = document.createElement('span');
+								verbSpan.textContent = conjugatedVerb;
+								verbSpan.classList.add('conjugated-verb');
+								const pronounceButton = document.createElement('button');
+								pronounceButton.textContent = '🔊';
+								pronounceButton.classList.add('pronounce-button');
+								pronounceButton.addEventListener('click', () => {
+									playAudio(conjugatedVerb);
+								});
+
+								cell.appendChild(pronounceButton);
+								cell.appendChild(verbSpan);
+								cell.appendChild(document.createElement('br'));
+							});
+							if(conjugations.length == 0) cell.innerHTML = ''; //Clear for tenses with no conjugations
+						});
+
+					});
+
+					function playAudio(text) {
+					fetch('/pronounce', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+						body: `text=${encodeURIComponent(text)}&lang=fr`
+					})
+					.then(response => {
+						if (!response.ok) {
+							throw new Error(`HTTP error! status: ${response.status}`);
+						}
+						return response.blob(); // Get the audio data as a Blob
+					})
+					.then(blob => {
+						const audioUrl = URL.createObjectURL(blob); // Create a URL for the Blob
+						const audio = new Audio(audioUrl); // Create a new Audio object
+						audio.play(); // Play the audio
+					})
+					.catch(error => {
+						console.error('Error during pronunciation:', error);
+						alert('Error playing audio. Please try again later.'); // User-friendly error message
+					});
+				}
+
+					exportButton.style.display = 'block';
+										
+					exportButton.addEventListener('click', async () => {
+						exportButton.disabled = true;  // Disable the button immediately
+						exportButton.textContent = "Exportation..."; // Provide visual feedback (optional)
+
+						try {
+							const response = await fetch('/export', { method: 'POST', body: formData });
+
+							if (!response.ok) {
+								const errorData = await response.json(); // Get error message from server if available
+								const errorMessage = errorData && errorData.error ? errorData.error : `HTTP error! status: ${response.status}`;
+								alert(`Error exporting: ${errorMessage}`); // Display error message
+
+							} else {
+								const data = await response.json();
+								alert(data.message); // Or handle the successful response as needed
+							}
+
+
+						} catch (error) {
+							console.error('Error during export:', error);
+							alert('An unexpected error occurred during export. Please try again later.');
+						} finally {
+							exportButton.disabled = false;  // Re-enable the button in the finally block
+							exportButton.textContent = "Exporter vers Excel"; // Reset button text
+						}
+					});
+					
+					document.getElementById('resultsContainer').appendChild(exportButton);
+
+				} else {
+					tbody.innerHTML = '<tr><td colspan="7">No results found.</td></tr>';
+				}
+			} catch (error) {
+				tbody.innerHTML = `<tr><td colspan="7">Error: ${error.message}</td></tr>`;
+			}
+		});
+		
+    </script>
+</body>
+</html>
