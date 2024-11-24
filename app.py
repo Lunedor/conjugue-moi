@@ -56,7 +56,7 @@ def set_language():
         
 def get_conjugations(url):
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'}
-    required_tenses = ['Présent', 'Imparfait', 'Passé composé', 'Futur', 'Impératif']
+    required_tenses = ['Présent', 'Imparfait', 'Passé composé', 'Futur', 'Conditionnel', 'Impératif', 'Plus-que-parfait', 'Passé antérieur', 'Futur antérieur']
     try:
         response = requests.get(url, headers=headers)
         response.raise_for_status()
@@ -84,6 +84,13 @@ def get_conjugations(url):
             ul_tag = imperatif_section.find('ul')
             if ul_tag:
                 conjugations['Impératif'] = [li.text.strip() for li in ul_tag.find_all('li')]
+        # Find and extract Conditionnel (separate section)
+        conditionnel_section = soup.find('section', id='conditionnel')
+        if conditionnel_section:
+            ul_tag = conditionnel_section.find('ul')
+            if ul_tag:
+                conjugations['Conditionnel'] = [li.text.strip() for li in ul_tag.find_all('li')]
+                
         return conjugations
 
     except requests.exceptions.RequestException as e:
@@ -214,13 +221,13 @@ def export_excel():
 
     workbook = openpyxl.Workbook()
     sheet = workbook.active
-    sheet.append(["Verb", "Meaning", "Présent", "Imparfait", "Passé Composé", "Futur Simple", "Impératif"])
+    sheet.append(['Infinitif', 'Traduction', 'Présent', 'Imparfait', 'Passé composé', 'Futur Simple', 'Conditionnel', 'Impératif', 'Plus-que-parfait', 'Passé antérieur', 'Futur antérieur'])
 
     for row_index, result in enumerate(results, 1):  # Start from 1 for row indexing
         sheet.cell(row=row_index + 1, column=1, value=result['verb'])  # Verb in column A
         sheet.cell(row=row_index + 1, column=2, value=result['meaning'])  # Meaning in column B
 
-        tenses = ['Présent', 'Imparfait', "Passé composé", "Futur", "Impératif"]
+        tenses = ['Présent', 'Imparfait', 'Passé composé', 'Futur', 'Conditionnel', 'Impératif', 'Plus-que-parfait', 'Passé antérieur', 'Futur antérieur']
         for col_index, tense in enumerate(tenses, 3):  # Start from 3 for column indexing
             conj_list = result['conjugations'].get(tense, [])
             cell_value = "\n".join(conj_list) if conj_list else ""
