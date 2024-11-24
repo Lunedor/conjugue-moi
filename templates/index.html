@@ -143,6 +143,19 @@
 			border-color: var(--button-bg);
 			border-style: solid;
 			border-width: 1px;
+			transition: border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+		
+		 #other_lang:focus { /* Visual feedback on focus */
+            border-color: var(--accent-color);
+            box-shadow: 0 0 5px var(--accent-color); 
+        }
+		
+        #languageFeedback { /* feedback message container */
+            margin-left: 10px;
+            font-size: 14px;
+            color: var(--accent-color); /* Use the accent color */
+            transition: opacity 0.3s ease; 
         }
 		
 		#loadingIndicator {
@@ -194,7 +207,7 @@
 
 
 				<input type="text" id="other_lang" style="display: none;" placeholder="e.g., 'nl'">
-
+				<span id="languageFeedback"></span>
 			</div>
 			<div class="mode-toggle">
 				<button id="darkModeToggle">
@@ -206,10 +219,9 @@
         <label for="verbs">Entrez les verbes (séparés par des virgules):</label>
         <textarea id="verbs" name="verbs[]" rows="5" cols="30"></textarea><br>
         <input type="submit" value="Soumettre">
-    </form>
-	<button id="exportButton" style="display:none;">Exporter vers Excel</button> </div>
+    </form></div>
     <div id="resultsContainer">
-		<div id="loadingIndicator" style="display: none;">Chargement...</div>
+		<div id="loadingIndicator" style="display: none;">Loading...</div>
         <table id="conjugationTable">
             <thead>
                 <tr>
@@ -229,12 +241,19 @@
     <script>
         const form = document.querySelector('form');
 		const tbody = document.querySelector('#conjugationTable tbody');
-		const exportButton = document.getElementById('exportButton'); // Get the export button
 		const darkModeToggle = document.getElementById('darkModeToggle');
         const body = document.body;
 		const targetLangSelect = document.getElementById('target_lang');
         const otherLangInput = document.getElementById('other_lang');
-
+		const resultsContainer = document.getElementById('resultsContainer');
+		const exportButton = document.createElement('button'); // Create the button dynamically
+		exportButton.id = 'exportButton';
+		exportButton.textContent = 'Exporter vers Excel';
+		exportButton.style.display = 'none';
+		resultsContainer.appendChild(exportButton);
+		const languageFeedback = document.getElementById('languageFeedback');
+        let currentOtherLang = "";
+	
         function updateDarkMode() {
 			body.classList.toggle('dark-mode');
 			const darkModeEnabled = body.classList.contains('dark-mode');
@@ -247,53 +266,76 @@
         darkModeToggle.addEventListener('click', updateDarkMode);
 
         document.addEventListener('DOMContentLoaded', () => {
-            const savedPreference = localStorage.getItem('darkMode');
+			const savedPreference = localStorage.getItem('darkMode');
 			const savedTargetLang = localStorage.getItem('target_lang');
-            if (savedPreference === 'enabled') {
-                body.classList.add('dark-mode');
-                darkModeToggle.innerHTML = '<i id="darkModeIcon" class="fas fa-moon"></i>';
-            } else if (savedPreference === 'disabled') {
-                body.classList.remove('dark-mode'); 
-                darkModeToggle.innerHTML = '<i id="darkModeIcon" class="fas fa-sun"></i>';
-            }
+			const savedOtherLang = localStorage.getItem('other_lang');
+
+			if (savedPreference === 'enabled') {
+				body.classList.add('dark-mode');
+				darkModeToggle.innerHTML = '<i id="darkModeIcon" class="fas fa-moon"></i>';
+			} else if (savedPreference === 'disabled') {
+				body.classList.remove('dark-mode');
+				darkModeToggle.innerHTML = '<i id="darkModeIcon" class="fas fa-sun"></i>';
+			}
+
 			if (savedTargetLang) {
-            if (targetLangSelect.querySelector(`option[value="${savedTargetLang}"]`)) {
-                // If the saved language is in the dropdown, select it
-                targetLangSelect.value = savedTargetLang;
-            } else {
-                // If not in the dropdown, set to 'other' and show input
-                targetLangSelect.value = 'other';
-                otherLangInput.style.display = 'inline-block';
-                otherLangInput.value = savedTargetLang;
+				if (savedOtherLang) { // Check if a custom language was previously saved
+
+					targetLangSelect.value = 'other'; // Set select to "other"
+					otherLangInput.style.display = 'inline-block';
+					otherLangInput.value = savedOtherLang;
+					currentOtherLang = savedOtherLang;
+					languageFeedback.textContent = `Selected: ${savedOtherLang}`;
+					setLanguage(savedOtherLang); // Set the saved custom language
+
+				} else if (targetLangSelect.querySelector(`option[value="${savedTargetLang}"]`)) {
+					// Standard language was selected
+					targetLangSelect.value = savedTargetLang;
+					setLanguage(savedTargetLang);
 				}
 			}
-			targetLangSelect.dispatchEvent(new Event('change'));
-        });
+
+			if (savedTargetLang) {
+				targetLangSelect.dispatchEvent(new Event('change'));
+			}
+		});
 		
 		targetLangSelect.addEventListener('change', () => {
             const selectedLang = targetLangSelect.value;
             if (selectedLang === 'other') {
                 otherLangInput.style.display = 'inline-block';
-                const savedOtherLang = localStorage.getItem('other_lang'); // Retrieve from localStorage for "other"
-                otherLangInput.value = savedOtherLang || '';
+                otherLangInput.value = currentOtherLang; // Restore previous value
+                otherLangInput.focus(); // Set focus to the input field
+
+                if (currentOtherLang) { 
+                    setLanguage(currentOtherLang);
+                    languageFeedback.textContent = `Selected: ${currentOtherLang}`; 
+                } else {
+                    languageFeedback.textContent = ''; // Clear feedback if no language is stored
+                }
             } else {
-                otherLangInput.style.display = 'none';
-                setLanguage(selectedLang);  // Set language immediately for standard options
+				otherLangInput.style.display = 'none';
+				currentOtherLang = ''; // Reset currentOtherLang when a standard language is selected!
+				languageFeedback.textContent = '';
+				setLanguage(selectedLang);
+				localStorage.setItem('target_lang', selectedLang);  // Store standard selection
+				localStorage.removeItem('other_lang'); // Clear stored "other" language
             }
         });
-		
-		otherLangInput.addEventListener('change', () => {
+
+        otherLangInput.addEventListener('change', () => { // Or 'blur'
 			const otherLang = otherLangInput.value.trim().toLowerCase();
-			console.log("Other language input:", otherLang); // Debugging
 			if (otherLang) {
-				setLanguage(otherLang); // Pass the actual input to setLanguage
-				localStorage.setItem('other_lang', otherLang);
+				currentOtherLang = otherLang;
+				languageFeedback.textContent = `Langue sélectionnée: ${currentOtherLang}`;
+				setLanguage(otherLang);
+				localStorage.setItem('other_lang', otherLang); 
 			} else {
-				alert("Please enter a valid language code.");
+				currentOtherLang = '';
+				languageFeedback.textContent = ""; // Clear feedback
 			}
 		});
 
-		
 		function setLanguage(newTargetLang) {
 			const langToSend = newTargetLang === 'other' ? otherLangInput.value.trim().toLowerCase() : newTargetLang;
 			console.log("Setting language:", langToSend); // Debugging
@@ -319,7 +361,6 @@
 				alert("An error occurred setting the language.");
 			});
 		}
-
 
 		if (!exportButton.hasEventListener) {  // Custom flag to prevent duplicate listeners
 			exportButton.addEventListener('click', async () => {
@@ -355,7 +396,7 @@
 					alert('An unexpected error occurred during export.');
 				} finally {
 					exportButton.disabled = false;
-					exportButton.textContent = "Export to Excel";
+					exportButton.textContent = "Exporter vers Excel";
 				}
 			});
 			exportButton.hasEventListener = true;  // Set custom flag
