@@ -60,7 +60,7 @@
         }
         button:hover, input[type="submit"]:hover { filter: brightness(50%); } /* Button hover effect */
 
-        table { width: 70%; border-collapse: collapse; margin: auto;}
+        table { width: 100%; border-collapse: collapse; margin: auto;}
         th, td { border: 1px solid var(--table-border); padding: 8px; text-align: left; }
         th { background-color: var(--table-header-bg); }
         #resultsContainer { margin-top: 10px; }
@@ -225,13 +225,17 @@
         <table id="conjugationTable">
             <thead>
                 <tr>
-                    <th>Verbe</th>
+                    <th>Infinitif</th>
                     <th>Traduction</th>
                     <th>Présent</th>
                     <th>Imparfait</th>
                     <th>Passé Composé</th>
                     <th>Futur Simple</th>
+					<th>Conditionnel</th>
                     <th>Impératif</th>
+					<th>Plus-que-parfait</th>
+					<th>Passé antérieur</th> 
+					<th>Futur antérieur</th>
                 </tr>
             </thead>
             <tbody></tbody>
@@ -451,7 +455,7 @@
 						row.insertCell().textContent = result.verb;
 						row.insertCell().textContent = result.meaning;
 
-						['Présent', 'Imparfait', 'Passé composé', 'Futur', 'Impératif'].forEach(tense => {
+						['Présent', 'Imparfait', 'Passé composé', 'Futur', 'Conditionnel', 'Impératif', 'Plus-que-parfait', 'Passé antérieur', 'Futur antérieur'].forEach(tense => {
 							const cell = row.insertCell();
 							const conjugations = result.conjugations[tense] || [];
 
