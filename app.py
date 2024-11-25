@@ -15,48 +15,67 @@ app.secret_key = os.urandom(24)
 
 translator = Translator()
 
-def get_word_data(word, target_lang='en'):
-    url = f"https://www.larousse.fr/dictionnaires/francais/{word}"
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'}
-    print(f"Translating {word} to {target_lang}") 
-    try:
-        response = requests.get(url, headers=headers, timeout=5) #Added timeout to prevent indefinite hangs
-        response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
-        soup = BeautifulSoup(response.content, "html.parser")
-        # improved translation handling:
-        try:
-          translation = translator.translate(word, src='fr', dest=target_lang)
-          meaning = translation.text
-        except Exception as e:
-          meaning = f"Translation error: {e}" # Handle translation errors gracefully
+tenseslist = ['Infinitif', 'Présent', 'Imparfait', 'Passé composé', 'Futur', 'Futur proche', 'Conditionnel', 'Impératif', 'Plus-que-parfait', 'Passé antérieur', 'Futur antérieur']
+tenseslistbasic = ['Infinitif', 'Présent', 'Imparfait', 'Passé composé', 'Futur', 'Futur proche', 'Conditionnel', 'Impératif']
 
+def get_word_data(word, target_lang='en'):
+    reflexive_pronouns = ["me ", "te ", "se ", "s'", "nous ", "vous "]
+    is_reflexive = any(word.startswith(pronoun) for pronoun in reflexive_pronouns)
+    url = f"https://www.larousse.fr/dictionnaires/francais/{word}"
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    try:
+        response = requests.get(url, headers=headers, timeout=5)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.content, "html.parser")
+
+        try:
+            translation = translator.translate(word, src='fr', dest=target_lang)
+            meaning = translation.text
+        except Exception as e:
+            meaning = f"Translation error: {e}"
 
         conjugation_url = None
-        verb_link = soup.find("a", string="Conjugaison")
-        if verb_link:
-            conjugation_url = "https://www.larousse.fr" + verb_link.get("href")
-        return meaning, conjugation_url
+        if is_reflexive:  # Special handling for reflexive verbs
+            verb_link = soup.find("a", href=re.compile(r"/conjugaison/francais/se%20"))
+            if verb_link:
+                conjugation_url = "https://www.larousse.fr" + verb_link.get("href")
+        else:
+            verb_link = soup.find("a", string="Conjugaison")  # Original logic
+            if verb_link:
+                conjugation_url = "https://www.larousse.fr" + verb_link.get("href")
+        infinitif_info = None
+        definition_block = soup.find("div", id="definition")
+        if definition_block:
+            entry_block = definition_block.find("div", class_="Zone-Entree1")
+            if entry_block:
+                h2_tag = entry_block.find("h2")
+                if h2_tag:
+                    text_parts = [part.strip() for part in h2_tag.contents if isinstance(part, str)]
+                    infinitif_info = "".join(text_parts)
+
+        return meaning, conjugation_url, infinitif_info
+
     except requests.exceptions.RequestException as e:
         print(f"Request error for {word}: {e}")
-        return f"Request error for {word}: {e}", None  #Return more informative error message
+        return f"Request error", None, None  # Return None for all three
+
     except Exception as e:
         print(f"An error occurred for {word}: {e}")
-        return f"An error occurred for {word}: {e}", None #Return more informative error message
+        return f"An error occurred: {e}", None, None # Return None for all three
 
 @app.route('/set_language', methods=['POST'])
 def set_language():
     target_lang = request.form.get('target_lang')
-    print(f"Received target_lang: {target_lang}")  # Debugging line
     if target_lang and (target_lang in LANGUAGES or target_lang in LANGUAGES.values()):
         session['target_lang'] = target_lang
-        print(f"Session updated with target_lang: {session['target_lang']}")  # Debugging line
         return jsonify({'message': 'Target language set successfully'}), 200
     else:
         return jsonify({'error': 'Invalid target language'}), 400
-        
+      
+      
 def get_conjugations(url):
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'}
-    required_tenses = ['Présent', 'Imparfait', 'Passé composé', 'Futur', 'Conditionnel', 'Impératif', 'Plus-que-parfait', 'Passé antérieur', 'Futur antérieur']
+    required_tenses = tenseslist
     try:
         response = requests.get(url, headers=headers)
         response.raise_for_status()
@@ -110,21 +129,43 @@ def index():
         return render_template('index.html', target_lang=session.get('target_lang', 'en'))
 
     elif request.method == 'POST':
-        session.pop('results', None)  # Clear any old results
-        target_lang = session.get('target_lang', 'en')  # Get the target language from the session
-        
-        verbs = request.form.getlist('verbs[]')  # Get the verbs list
-        if not verbs or all(v.strip() == '' for v in verbs):  # Check for empty or blank inputs
+        session.pop('results', None)
+        target_lang = session.get('target_lang', 'en')
+        verbs = request.form.getlist('verbs[]')
+        if not verbs or all(v.strip() == '' for v in verbs):
             return jsonify({'error': 'No verbs provided for translation'}), 400
 
         results = []
         for verb in verbs:
+            reflexive_pronouns = ["me ", "te ", "se ", "s'", "nous ", "vous "]
+            is_reflexive = any(verb.startswith(pronoun) for pronoun in reflexive_pronouns)
             verb = verb.strip()
-            if verb:  # Skip empty verbs
-                meaning, conjugation_url = get_word_data(verb, target_lang)  # Pass target_lang
-                conjugations = {}
+            if verb:
+                meaning, conjugation_url, infinitif_info = get_word_data(verb, target_lang)
+
+                conjugations = {}  # Important: Initialize conjugations HERE
+
                 if conjugation_url:
                     conjugations = get_conjugations(conjugation_url)
+
+                #Correctly handle the infinitive even if it's pronominal
+                if is_reflexive and 'Présent' in conjugations:  #Handle reflexive infinitives not in main infinitive block
+                    conjugations['Infinitif'] = ["se " + infinitif_info]
+                elif infinitif_info:
+                    conjugations['Infinitif'] = [infinitif_info]
+                elif 'Infinitif' in conjugations and conjugations['Infinitif']:
+                    conjugations['Infinitif'] = [conjugations['Infinitif'][0]] #Clean up the infinitive
+                    
+                #Improved Futur proche handling:
+                if 'Présent' in conjugations and conjugations['Infinitif']:
+                    if is_reflexive:
+                        pronouns = ["je vais me", "tu vas te", "il, elle va se", "nous allons nous", "vous allez vous", "ils, elles vont se"]
+                        conjugations['Futur proche'] = [f"{pronoun} {infinitif_info}" for pronoun in pronouns]
+                    else:  # Non-reflexive verbs
+                        conjugations['Futur proche'] = [
+                            f"{pronoun} {infinitif_info}"
+                            for pronoun in ["je vais", "tu vas", "il, elle va", "nous allons", "vous allez", "ils, elles vont"]
+                        ]
                 results.append({'verb': verb, 'meaning': meaning, 'conjugations': conjugations})
 
         session['results'] = results
@@ -218,18 +259,20 @@ def export_excel():
 
     if not results:
         return jsonify({'error': 'No data to export. Please submit verbs first.'}), 400
-
+    
+    advance_mode = request.headers.get('X-Advance-Mode')  # Get the mode from the header
+    tenseslistexport = tenseslist if advance_mode == 'Advance' else tenseslistbasic
     workbook = openpyxl.Workbook()
     sheet = workbook.active
-    sheet.append(['Infinitif', 'Traduction', 'Présent', 'Imparfait', 'Passé composé', 'Futur Simple', 'Conditionnel', 'Impératif', 'Plus-que-parfait', 'Passé antérieur', 'Futur antérieur'])
+    sheet.append(['Infinitif', 'Traduction'] + tenseslistexport)
 
     for row_index, result in enumerate(results, 1):  # Start from 1 for row indexing
         sheet.cell(row=row_index + 1, column=1, value=result['verb'])  # Verb in column A
         sheet.cell(row=row_index + 1, column=2, value=result['meaning'])  # Meaning in column B
 
-        tenses = ['Présent', 'Imparfait', 'Passé composé', 'Futur', 'Conditionnel', 'Impératif', 'Plus-que-parfait', 'Passé antérieur', 'Futur antérieur']
-        for col_index, tense in enumerate(tenses, 3):  # Start from 3 for column indexing
+        for col_index, tense in enumerate(tenseslistexport, 3):  # Start from 3 for column indexing
             conj_list = result['conjugations'].get(tense, [])
+            print(result['conjugations'])
             cell_value = "\n".join(conj_list) if conj_list else ""
             cell = sheet.cell(row=row_index + 1, column=col_index, value=cell_value)
             cell.alignment = openpyxl.styles.Alignment(wrapText=True)
