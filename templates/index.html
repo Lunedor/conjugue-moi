@@ -28,6 +28,7 @@
 
         body {
             font-family: sans-serif;
+			font-size: 12px;
             background-color: var(--bg-color);
             color: var(--text-color);
             transition: background-color 0.3s ease, color 0.3s ease; /* Smooth transition for mode change */
@@ -40,9 +41,9 @@
         label { display: block; margin: 5px; }
 		
         textarea { 
-			width: 100%; 
+			width: 50%; 
 			padding: 10px; 
-			border: 1px solid var(--table-border); 
+			border: 1px solid var(--table-border);
 			margin-bottom: 10px; 
 			border-radius: 8px;
 			background-color: var(--table-header-bg);
@@ -60,13 +61,21 @@
         }
         button:hover, input[type="submit"]:hover { filter: brightness(50%); } /* Button hover effect */
 
-        table { width: 100%; border-collapse: collapse; margin: auto;}
+        table.basic-mode {
+			width: 70%; /* Table width for basic mode */
+			margin: auto;
+		}
+
+		table.advance-mode {
+			width: 100%; /* Table width for advanced mode */
+			margin: auto;
+		}
         th, td { border: 1px solid var(--table-border); padding: 8px; text-align: left; }
         th { background-color: var(--table-header-bg); }
         #resultsContainer { margin-top: 10px; }
 
         .mode-toggle {
-            position: fixed; /* Fixed position */
+            position: absolute; /* Absolute position */
             top: 5px;       /* Top-right corner */
             right: 50px;
         }
@@ -88,8 +97,33 @@
 			color: var(--text-color); /* Highlight color */
 		}
 
+		.advance-toggle {
+            position: absolute; /* Absolute position */
+            top: 20px;       /* Top-right corner */
+            left: 10px;
+        }
+		
+		#advanceMode {
+			cursor: pointer;
+			padding: 7px;
+			font-size: 14px;
+			color: var(--accent-color);
+			transition: transform 0.2s ease, color 0.2s ease;
+			background-color: var(--bg-color);
+			border-radius: 8px;
+			width: 100px;
+			border-color: var(--button-bg);
+			border-style: solid;
+			border-width: 1px;
+			transition: transform 0.2s ease, color 0.2s ease;
+		}
 
-         button { /* General button styles */
+		#advanceMode:hover {
+			transform: scale(1.02); /* Slight zoom on hover */
+			color: var(--text-color); /* Highlight color */
+		}
+
+        button { /* General button styles */
             padding: 8px 12px; /* Slightly reduced padding */
             border-radius: 4px;
 			margin: auto;
@@ -113,12 +147,12 @@
             filter: brightness(1.2); /* Slightly brighter on hover */
         }
 
-        span.conjugated-verb { margin-left: 8px; }
+        span.conjugated-verb { margin-left: 1px; }
 		
 		.language-selector { /* Improved positioning */
             display: flex;  /* Use flexbox for better alignment */
             align-items: center; /* Vertically center items */
-            position: fixed;
+            position: absolute;
             top: 20px;
             right: 120px; 
         }
@@ -166,6 +200,10 @@
 			margin-top: 10px;
 		}
 		
+		.hidden {
+		display: none;
+		}
+		
     </style>
 </head>
 <body>
@@ -204,8 +242,6 @@
 					<option value="uk">Ukrainian</option>
 					<option value="other">Other...</option> 
 					</select>
-
-
 				<input type="text" id="other_lang" style="display: none;" placeholder="e.g., 'nl'">
 				<span id="languageFeedback"></span>
 			</div>
@@ -214,8 +250,12 @@
 					<i id="darkModeIcon" class="fas fa-sun"></i>
 				</button>
 			</div>
+			<div class="advance-toggle">
+				<input onclick="updateAdvanceMode()" type="button" value="Advance" id="advanceMode"></input>
+				</div>
+			</div>
     <h1>Conjugue-Moi!</h1>
-    <form method="POST">
+    <form method="POST" style="text-align: center;">
         <label for="verbs">Entrez les verbes (séparés par des virgules):</label>
         <textarea id="verbs" name="verbs[]" rows="5" cols="30"></textarea><br>
         <input type="submit" value="Soumettre">
@@ -230,7 +270,8 @@
                     <th>Présent</th>
                     <th>Imparfait</th>
                     <th>Passé Composé</th>
-                    <th>Futur Simple</th>
+                    <th>Futur</th>
+					<th>Future Proche</th>
 					<th>Conditionnel</th>
                     <th>Impératif</th>
 					<th>Plus-que-parfait</th>
@@ -257,6 +298,9 @@
 		resultsContainer.appendChild(exportButton);
 		const languageFeedback = document.getElementById('languageFeedback');
         let currentOtherLang = "";
+		let modeCurrent = ""
+		const tenseslistadvance = ['Présent', 'Imparfait', 'Passé composé', 'Futur', 'Futur proche', 'Conditionnel', 'Impératif', 'Plus-que-parfait', 'Passé antérieur', 'Futur antérieur'];
+		const tenseslistbasic = ['Présent', 'Imparfait', 'Passé composé', 'Futur', 'Futur proche', 'Conditionnel', 'Impératif'];
 	
         function updateDarkMode() {
 			body.classList.toggle('dark-mode');
@@ -266,14 +310,102 @@
 				: '<i id="darkModeIcon" class="fas fa-sun"></i>'; // Sun icon for light mode
 			localStorage.setItem('darkMode', darkModeEnabled ? 'enabled' : 'disabled');
 		}
+		
+		const modeIndicator = document.getElementById('modeIndicator');
 
-        darkModeToggle.addEventListener('click', updateDarkMode);
 
+		function updateAdvanceMode() {
+			const table = document.querySelector('#conjugationTable');
+			const advanceTenses = ['Plus-que-parfait', 'Passé antérieur', 'Futur antérieur'];
+
+			if (document.getElementById("advanceMode").value !== "Base") {
+				// Switch to "Base" mode
+				document.getElementById("advanceMode").value = "Base";
+				modeCurrent = "Base";
+
+				// Hide advance mode columns
+				advanceTenses.forEach(tense => {
+					const colIndex = tenseslistadvance.indexOf(tense) + 2;
+					document.querySelector('#conjugationTable thead tr').children[colIndex]?.classList.add('hidden');
+					document.querySelectorAll('#conjugationTable tbody tr').forEach(row => {
+						row.children[colIndex]?.classList.add('hidden');
+					});
+				});
+
+				// Update table width
+				table.classList.remove('advance-mode');
+				table.classList.add('basic-mode');
+
+				localStorage.setItem('advanceMode', 'basic');
+			} else {
+				// Switch to "Advance" mode
+				document.getElementById("advanceMode").value = "Advance";
+				modeCurrent = "Advance";
+
+				// Show advance mode columns
+				advanceTenses.forEach(tense => {
+					const colIndex = tenseslistadvance.indexOf(tense) + 2;
+					document.querySelector('#conjugationTable thead tr').children[colIndex]?.classList.remove('hidden');
+					document.querySelectorAll('#conjugationTable tbody tr').forEach(row => {
+						row.children[colIndex]?.classList.remove('hidden');
+					});
+				});
+
+				// Update table width
+				table.classList.remove('basic-mode');
+				table.classList.add('advance-mode');
+
+				localStorage.setItem('advanceMode', 'advance');
+			}
+		}
+	
+		function updateTableHeaders() {
+			const table = document.querySelector('#conjugationTable');
+			const advanceMode = localStorage.getItem('advanceMode') || 'basic'; // Default to basic mode
+			const advanceTenses = ['Plus-que-parfait', 'Passé antérieur', 'Futur antérieur'];
+
+			if (advanceMode === 'basic') {
+				// Hide advance mode columns
+				advanceTenses.forEach(tense => {
+					const colIndex = tenseslistadvance.indexOf(tense) + 2;
+					document.querySelector('#conjugationTable thead tr').children[colIndex]?.classList.add('hidden');
+					document.querySelectorAll('#conjugationTable tbody tr').forEach(row => {
+						row.children[colIndex]?.classList.add('hidden');
+					});
+				});
+
+				// Apply basic mode width
+				table.classList.add('basic-mode');
+				table.classList.remove('advance-mode');
+			} else if (advanceMode === 'advance') {
+				// Show all columns
+				advanceTenses.forEach(tense => {
+					const colIndex = tenseslistadvance.indexOf(tense) + 2;
+					document.querySelector('#conjugationTable thead tr').children[colIndex]?.classList.remove('hidden');
+					document.querySelectorAll('#conjugationTable tbody tr').forEach(row => {
+						row.children[colIndex]?.classList.remove('hidden');
+					});
+				});
+
+				// Apply advance mode width
+				table.classList.add('advance-mode');
+				table.classList.remove('basic-mode');
+			}
+
+			// Update the toggle button state
+			const toggleButton = document.getElementById('advanceMode');
+			toggleButton.value = advanceMode === 'basic' ? 'Base' : 'Advance';
+			modeCurrent = advanceMode; // Set the global variable correctly
+		}
+	
+		darkModeToggle.addEventListener('click', updateDarkMode);
+		
         document.addEventListener('DOMContentLoaded', () => {
 			const savedPreference = localStorage.getItem('darkMode');
 			const savedTargetLang = localStorage.getItem('target_lang');
 			const savedOtherLang = localStorage.getItem('other_lang');
 
+			// Apply dark mode if saved
 			if (savedPreference === 'enabled') {
 				body.classList.add('dark-mode');
 				darkModeToggle.innerHTML = '<i id="darkModeIcon" class="fas fa-moon"></i>';
@@ -282,28 +414,19 @@
 				darkModeToggle.innerHTML = '<i id="darkModeIcon" class="fas fa-sun"></i>';
 			}
 
+			// Apply saved target language
 			if (savedTargetLang) {
-				if (savedOtherLang) { // Check if a custom language was previously saved
-
-					targetLangSelect.value = 'other'; // Set select to "other"
+				targetLangSelect.value = savedTargetLang === 'other' ? 'other' : savedTargetLang;
+				if (savedOtherLang && savedTargetLang === 'other') {
 					otherLangInput.style.display = 'inline-block';
 					otherLangInput.value = savedOtherLang;
-					currentOtherLang = savedOtherLang;
-					languageFeedback.textContent = `Selected: ${savedOtherLang}`;
-					setLanguage(savedOtherLang); // Set the saved custom language
-
-				} else if (targetLangSelect.querySelector(`option[value="${savedTargetLang}"]`)) {
-					// Standard language was selected
-					targetLangSelect.value = savedTargetLang;
-					setLanguage(savedTargetLang);
 				}
 			}
 
-			if (savedTargetLang) {
-				targetLangSelect.dispatchEvent(new Event('change'));
-			}
+			// Configure table headers and rows for initial mode
+			updateTableHeaders();
 		});
-		
+
 		targetLangSelect.addEventListener('change', () => {
             const selectedLang = targetLangSelect.value;
             if (selectedLang === 'other') {
@@ -342,7 +465,6 @@
 
 		function setLanguage(newTargetLang) {
 			const langToSend = newTargetLang === 'other' ? otherLangInput.value.trim().toLowerCase() : newTargetLang;
-			console.log("Setting language:", langToSend); // Debugging
 
 			fetch('/set_language', {
 				method: 'POST',
@@ -352,7 +474,6 @@
 			.then(response => {
 				if (response.ok) {
 					localStorage.setItem('target_lang', langToSend);
-					console.log("Target language set to:", langToSend);
 				} else {
 					response.json().then(errorData => {
 						const error = errorData.error || "Error setting language. Please check the language code.";
@@ -375,8 +496,8 @@
 					const verbs = document.getElementById('verbs').value.trim().split('\n');
 					const formData = new FormData();
 					verbs.forEach(verb => formData.append('verbs[]', verb.trim()));
-
-					const response = await fetch('/export', { method: 'POST', body: formData });
+										
+					const response = await fetch('/export', { method: 'POST', body: formData, headers: { 'X-Advance-Mode': modeCurrent} });
 					if (!response.ok) {
 						const errorData = await response.json();
 						alert(`Error exporting: ${errorData.error}`);
@@ -433,6 +554,7 @@
 			event.preventDefault();
 			const verbs = document.getElementById('verbs').value.trim().split(',');
 			const formData = new FormData();
+			const advanceModeToggle = localStorage.getItem('advanceMode');
 
 			verbs.forEach(verb => {
 				formData.append('verbs[]', verb.trim());
@@ -443,19 +565,36 @@
 			try {
 				document.getElementById('loadingIndicator').style.display = 'block';
 				const targetLang = document.getElementById('target_lang').value || 'en';
-				const response = await fetch('/', { method: 'POST', body: formData, headers: { 'X-Target-Language': targetLang}  });
+				const response = await fetch('/', { method: 'POST', body: formData, headers: { 'X-Target-Language': targetLang} });
 				if (!response.ok) {
 					throw new Error(`HTTP error! status: ${response.status}`);
 				}
 				const data = await response.json();
-
 				if (data.results && data.results.length > 0) {
 					data.results.forEach((result, rowIndex) => {
 						const row = tbody.insertRow();
-						row.insertCell().textContent = result.verb;
-						row.insertCell().textContent = result.meaning;
 
-						['Présent', 'Imparfait', 'Passé composé', 'Futur', 'Conditionnel', 'Impératif', 'Plus-que-parfait', 'Passé antérieur', 'Futur antérieur'].forEach(tense => {
+						const infinitifConjugations = result.conjugations.Infinitif || [];
+						const infinitif = infinitifConjugations.length > 0 ? infinitifConjugations[0] : '';
+
+						const infinitifCell = row.insertCell();
+						const pronounceButton = document.createElement('button');
+						pronounceButton.textContent = '🔊';
+						pronounceButton.classList.add('pronounce-button');
+						pronounceButton.addEventListener('click', () => {
+							playAudio(infinitif);
+						});
+						infinitifCell.appendChild(pronounceButton);
+
+						const verbSpan = document.createElement('span');
+						verbSpan.textContent = infinitif;
+						verbSpan.classList.add('conjugated-verb');
+						infinitifCell.appendChild(verbSpan);
+
+						const translationCell = row.insertCell();
+						translationCell.textContent = result.meaning;
+
+						tenseslistadvance.forEach(tense => {
 							const cell = row.insertCell();
 							const conjugations = result.conjugations[tense] || [];
 
@@ -474,9 +613,8 @@
 								cell.appendChild(verbSpan);
 								cell.appendChild(document.createElement('br'));
 							});
-							if(conjugations.length == 0) cell.innerHTML = ''; //Clear for tenses with no conjugations
+							if (conjugations.length == 0) cell.innerHTML = '';
 						});
-
 					});
 
 					exportButton.style.display = 'block';
@@ -485,15 +623,16 @@
 				} else {
 					tbody.innerHTML = '<tr><td colspan="7">No results found.</td></tr>';
 				}
-			} 
-		catch (error) {
+
+				// Reapply the current mode's settings (hide/show headers and adjust width)
+				updateTableHeaders();
+			} catch (error) {
 				tbody.innerHTML = `<tr><td colspan="7">Error: ${error.message}</td></tr>`;
-			}
-			finally {
-			// Hide loading indicator regardless of success or failure:
-			document.getElementById('loadingIndicator').style.display = 'none';
+			} finally {
+				document.getElementById('loadingIndicator').style.display = 'none';
 			}
 		});
+
 		
     </script>
 </body>
