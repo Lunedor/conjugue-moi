@@ -100,7 +100,7 @@
 		.advance-toggle {
             position: absolute; /* Absolute position */
             top: 20px;       /* Top-right corner */
-            left: 10px;
+            left: 50px;
         }
 		
 		#advanceMode {
@@ -201,7 +201,7 @@
 		}
 		
 		.hidden {
-		display: none;
+			display: none;
 		}
 		
     </style>
@@ -251,7 +251,7 @@
 				</button>
 			</div>
 			<div class="advance-toggle">
-				<input onclick="updateAdvanceMode()" type="button" value="Advance" id="advanceMode"></input>
+				<input onclick="updateAdvanceMode()" type="button" value="Avancé" id="advanceMode"></input>
 				</div>
 			</div>
     <h1>Conjugue-Moi!</h1>
@@ -318,9 +318,9 @@
 			const table = document.querySelector('#conjugationTable');
 			const advanceTenses = ['Plus-que-parfait', 'Passé antérieur', 'Futur antérieur'];
 
-			if (document.getElementById("advanceMode").value !== "Base") {
+			if (document.getElementById("advanceMode").value !== "Basique") {
 				// Switch to "Base" mode
-				document.getElementById("advanceMode").value = "Base";
+				document.getElementById("advanceMode").value = "Basique";
 				modeCurrent = "Base";
 
 				// Hide advance mode columns
@@ -339,7 +339,7 @@
 				localStorage.setItem('advanceMode', 'basic');
 			} else {
 				// Switch to "Advance" mode
-				document.getElementById("advanceMode").value = "Advance";
+				document.getElementById("advanceMode").value = "Avancé";
 				modeCurrent = "Advance";
 
 				// Show advance mode columns
@@ -394,7 +394,7 @@
 
 			// Update the toggle button state
 			const toggleButton = document.getElementById('advanceMode');
-			toggleButton.value = advanceMode === 'basic' ? 'Base' : 'Advance';
+			toggleButton.value = advanceMode === 'basic' ? 'Basique' : 'Avancé';
 			modeCurrent = advanceMode; // Set the global variable correctly
 		}
 	
